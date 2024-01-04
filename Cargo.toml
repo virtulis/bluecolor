@@ -1,0 +1,15 @@
+[package]
+name = "bluecolor"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+btleplug = "0.11.4"
+tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread", "macros"] }
+uuid = "1.6.1"
+hex = { version = "0.4.3", features = [] }
+tokio-stream = "0.1.14"
+lazy_static = "1.4.0"
+byteorder = "1.5.0"
