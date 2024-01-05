@@ -19,7 +19,7 @@ use tokio_stream::{StreamExt, StreamMap};
 use uuid::Uuid;
 use crate::output::{JSONPrinter, OutputFormat, OutputPrinter, ScanResult, TextPrinter, Triple};
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 struct Args {
 	/// Address of the device to use (e.g. 00:11:22:33:44:55)
