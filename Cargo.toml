@@ -3,13 +3,16 @@ name = "bluecolor"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-btleplug = "0.11.4"
-tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread", "macros"] }
-uuid = "1.6.1"
-hex = { version = "0.4.3", features = [] }
-tokio-stream = "0.1.14"
+clap = { version = "4.4.13", features = ["derive"] }
+anyhow = "1.0.79"
+log = "0.4.20"
+env_logger = "0.10.1"
 lazy_static = "1.4.0"
+tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread", "macros"] }
+tokio-stream = "0.1.14"
+btleplug = "0.11.4"
+uuid = "1.6.1"
+hex = "0.4.3"
 byteorder = "1.5.0"
+jzon = "0.12.5"
