@@ -52,11 +52,9 @@ lazy_static! {
 	/// Notification characteristic
 	static ref NOTIF_CHR_ID: Uuid = Uuid::parse_str("0000ffe4-0000-1000-8000-00805f9b34fb").unwrap();
 	
-	/// I'm actually not sure what this does, but the string is hardcoded in the app and sent before the scan command sometimes.
-	static ref PAIR_CMD: Vec<u8> = hex::decode("AB440000000036001864").unwrap();
-	
 	/// The command to trigger a color scan (results sent as AB44... notification)
-	static ref SCAN_CMD: Vec<u8> = hex::decode("AB200B0002009B43").unwrap();
+	static ref SCAN_CMD: Vec<u8> = hex::decode("AB440000000036001864").unwrap();
+	
 	
 }
 
@@ -144,8 +142,6 @@ async fn main() -> Result<(), anyhow::Error> {
 	let write_char = chars.iter().find(|c| c.uuid == *WRITE_CHR_ID).unwrap();
 	trace!("write_char = {write_char:?}");
 	
-	debug!("Writing pair command");
-	device.write(write_char, &PAIR_CMD, WithoutResponse).await?;
 	debug!("Writing scan command");
 	device.write(write_char, &SCAN_CMD, WithoutResponse).await?;
 	
