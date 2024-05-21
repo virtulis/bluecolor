@@ -71,7 +71,7 @@ Run as:
 
 Output:
 
-```ldjson
+```json lines
 {"device_info":[2023,2311,6921,-14053,1993,8711,2594,-13814,-15926,21953,85,28928,-11919,3793,14]}
 {"power_level":41}
 {"calibrated":true}
