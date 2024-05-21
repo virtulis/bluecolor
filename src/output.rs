@@ -40,17 +40,21 @@ pub struct ScanResult {
 }
 pub trait OutputPrinter: Send {
 	fn print_result(&self, res: ScanResult);
+	fn print_misc(&self, key: &str, value: JsonValue);
 }
 
 pub struct TextPrinter;
 impl OutputPrinter for TextPrinter {
 	fn print_result(&self, res: ScanResult) {
 		println!("Scan result #: {}", res.idx);
-		println!("Lab: {}", res.lab);
-		println!("Luv: {}", res.luv);
-		println!("Lch: {}", res.lch);
-		println!("yxY: {}", res.yxy);
-		println!("RGB: {}", res.rgb);
+		println!("\tLab: {}", res.lab);
+		println!("\tLuv: {}", res.luv);
+		println!("\tLch: {}", res.lch);
+		println!("\tyxY: {}", res.yxy);
+		println!("\tRGB: {}", res.rgb);
+	}
+	fn print_misc(&self, key: &str, value: JsonValue) {
+		println!("Update: {} = {}", key, value);
 	}
 }
 
@@ -61,14 +65,21 @@ impl OutputPrinter for JSONPrinter {
 			// These dances are the easiest way I found to strip the float noise
 			jzon::number::Number::from_parts(n.is_sign_positive(), (n.abs() * 100.0).round() as u64, -2)
 		)).into()); 
-		let obj = jzon::object! {
+		let scan = jzon::object! {
 			lab: json_triple(res.lab),
 			luv: json_triple(res.luv),
 			lch: json_triple(res.lch),
 			yxy: json_triple(res.yxy),
 			rgb: Vec::from(res.rgb.0),
 		};
+		let obj = jzon::object! { scan: scan };
 		println!("{obj}");
 	}
+	fn print_misc(&self, key: &str, value: JsonValue) {
+		let mut obj = JsonValue::new_object();
+		obj.insert(key, value).unwrap();
+		println!("{}", obj);
+	}
+	
 }
 
