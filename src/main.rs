@@ -232,7 +232,8 @@ async fn main() -> Result<(), anyhow::Error> {
 	if args.calibrate {
 		debug!("Writing calibrate command");
 		enqueue_command(&CALIBRATE_CMD).await?;
-	} else if args.scan {
+	}
+	if args.scan {
 		debug!("Writing scan command");
 		enqueue_command(&SCAN_CMD).await?;
 	}
