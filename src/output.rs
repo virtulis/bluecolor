@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use jzon::JsonValue;
+use crate::data::{Event, ScanResult, Triple};
 
 #[derive(Clone, Copy, Debug)]
 pub enum OutputFormat {
@@ -21,64 +22,64 @@ impl FromStr for OutputFormat {
 	}
 }
 
-#[derive(Debug)]
-pub struct Triple<T: Display + Copy + Into<JsonValue>> (pub [T; 3]);
-impl <T: Display + Copy + Into<JsonValue>> Display for Triple<T> {
-	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0.map(|n| n.to_string()).join(", "))
-	}
-}
-
-#[derive(Debug)]
-pub struct ScanResult {
-	pub idx: usize,
-	pub lab: Triple<f32>,
-	pub luv: Triple<f32>,
-	pub lch: Triple<f32>,
-	pub yxy: Triple<f32>,
-	pub rgb: Triple<u8>,
-}
 pub trait OutputPrinter: Send {
-	fn print_result(&self, res: ScanResult);
-	fn print_misc(&self, key: &str, value: JsonValue);
+	// fn format_result(&self, res: ScanResult) -> String;
+	fn format_event(&self, event: &Event) -> Option<String>;
 }
 
 pub struct TextPrinter;
 impl OutputPrinter for TextPrinter {
-	fn print_result(&self, res: ScanResult) {
-		println!("Scan result #: {}", res.idx);
-		println!("\tLab: {}", res.lab);
-		println!("\tLuv: {}", res.luv);
-		println!("\tLch: {}", res.lch);
-		println!("\tyxY: {}", res.yxy);
-		println!("\tRGB: {}", res.rgb);
-	}
-	fn print_misc(&self, key: &str, value: JsonValue) {
-		println!("Update: {} = {}", key, value);
+	fn format_event(&self, event: &Event) -> Option<String> {
+		match event {
+			Event::Scan(res) => Some(vec![
+				format!("Scan result #: {}", res.idx),
+				format!("\tLab: {}", res.lab),
+				format!("\tLuv: {}", res.luv),
+				format!("\tLch: {}", res.lch),
+				format!("\tyxY: {}", res.yxy),
+				format!("\tRGB: {}", res.rgb),
+			].join("\n")),
+			Event::PowerLevel(val) => Some(format!("Power level: {val}")),
+			Event::Error(str) => Some(format!("Error: {str}")),
+			Event::Calibrated => Some("Calibrated".to_owned()),
+			Event::Connected(addr, name) => Some(format!("Connected to {} ({})", addr, name.clone().unwrap_or("unnamed".to_owned()))),
+			_ => None,
+		}
 	}
 }
 
 pub struct JSONPrinter;
-impl OutputPrinter for JSONPrinter {
-	fn print_result(&self, res: ScanResult) {
-		let json_triple = |t: Triple<f32>| JsonValue::Array(t.0.map(|n| JsonValue::Number(
+impl JSONPrinter {
+	pub fn format_result(&self, res: &ScanResult) -> JsonValue {
+		let json_triple = |t: &Triple<f32>| JsonValue::Array(t.0.map(|n| JsonValue::Number(
 			// These dances are the easiest way I found to strip the float noise
 			jzon::number::Number::from_parts(n.is_sign_positive(), (n.abs() * 100.0).round() as u64, -2)
-		)).into()); 
+		)).into());
 		let scan = jzon::object! {
-			lab: json_triple(res.lab),
-			luv: json_triple(res.luv),
-			lch: json_triple(res.lch),
-			yxy: json_triple(res.yxy),
+			lab: json_triple(&res.lab),
+			luv: json_triple(&res.luv),
+			lch: json_triple(&res.lch),
+			yxy: json_triple(&res.yxy),
 			rgb: Vec::from(res.rgb.0),
 		};
-		let obj = jzon::object! { scan: scan };
-		println!("{obj}");
+		jzon::object! { scan: scan }
 	}
-	fn print_misc(&self, key: &str, value: JsonValue) {
-		let mut obj = JsonValue::new_object();
-		obj.insert(key, value).unwrap();
-		println!("{}", obj);
+}
+impl OutputPrinter for JSONPrinter {
+	fn format_event(&self, event: &Event) -> Option<String> {
+		let msg = match event {
+			Event::Exit => Some(jzon::array!["exit"]),
+			Event::Error(str) => Some(jzon::array!["error", str.clone()]),
+			Event::Scan(res) => Some(jzon::array!["scan", res.idx, self.format_result(&res)]),
+			Event::Connecting => Some(jzon::array!["connecting"]),
+			Event::Connected(addr, name) => Some(jzon::array!["connected", addr.clone(), name.clone()]),
+			Event::Disconnected => Some(jzon::array!["disconnected"]),
+			Event::PowerLevel(val) => Some(jzon::array!["power_level", val.clone()]),
+			Event::DeviceInfo(val) => Some(jzon::array!["device_info", val.clone()]),
+			Event::Calibrated => Some(jzon::array!["calibrated"]),
+			Event::Command(_) => None,
+		};
+		msg.map(|m| format!("{m}"))
 	}
 	
 }

@@ -4,15 +4,18 @@ version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.4.13", features = ["derive"] }
-anyhow = "1.0.79"
-log = "0.4.20"
-env_logger = "0.10.1"
-lazy_static = "1.4.0"
-tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread", "macros"] }
-tokio-stream = "0.1.14"
-btleplug = "0.11.4"
-uuid = "1.6.1"
+clap = { version = "4.5.26", features = ["derive"] }
+anyhow = "1.0.95"
+log = "0.4.22"
+env_logger = "0.11.6"
+lazy_static = "1.5.0"
+tokio = { version = "1.43.0", features = ["rt", "rt-multi-thread", "macros"] }
+tokio-stream = "0.1.17"
+btleplug = "0.11.7"
+uuid = "1.11.1"
 hex = "0.4.3"
 byteorder = "1.5.0"
 jzon = "0.12.5"
+rustyline-async = "0.4.4"
+tokio-util = "0.7.13"
+futures = "0.3.31"
