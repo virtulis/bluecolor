@@ -1,12 +1,12 @@
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
-use jzon::JsonValue;
 use crate::data::{Event, ScanResult, Triple};
+use jzon::JsonValue;
+use log::debug;
+use std::str::FromStr;
+use tokio::sync::broadcast;
 
 #[derive(Clone, Copy, Debug)]
 pub enum OutputFormat {
 	Text,
-	// TSV,
 	JSON,
 }
 
@@ -15,7 +15,6 @@ impl FromStr for OutputFormat {
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match &*s.to_ascii_lowercase() {
 			"text" => Ok(Self::Text),
-			// "tsv" => Ok(Self::TSV),
 			"json" => Ok(Self::JSON),
 			_ => Err(format!("Unknown output format: {s}"))
 		}
@@ -23,7 +22,6 @@ impl FromStr for OutputFormat {
 }
 
 pub trait OutputPrinter: Send {
-	// fn format_result(&self, res: ScanResult) -> String;
 	fn format_event(&self, event: &Event) -> Option<String>;
 }
 
@@ -82,5 +80,26 @@ impl OutputPrinter for JSONPrinter {
 		msg.map(|m| format!("{m}"))
 	}
 	
+}
+
+pub async fn log_loop(
+	mut brx: broadcast::Receiver<Event>,
+	printer: Option<Box<dyn OutputPrinter>>
+) -> Result<(), anyhow::Error> {
+	loop {
+		match brx.recv().await? {
+			Event::Exit => {
+				break;
+			}
+			e => {
+				debug!("event: {e:?}");
+				let out = printer.as_ref().map(|p| p.format_event(&e)).flatten();
+				if let Some(out) = out {
+					println!("{}", out);
+				}
+			},
+		}
+	}
+	Ok(())
 }
 
