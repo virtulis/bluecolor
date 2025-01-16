@@ -1,5 +1,5 @@
 use crate::data::{Command, Event, ScanResult, Triple};
-use crate::Args;
+use crate::{device, Args};
 use btleplug::api::CentralEvent::DeviceDiscovered;
 use btleplug::api::WriteType::WithoutResponse;
 use btleplug::api::{BDAddr, Central, Manager as _, Peripheral as _, PeripheralProperties, ScanFilter};
@@ -7,13 +7,14 @@ use btleplug::platform::{Manager, Peripheral};
 use byteorder::ByteOrder;
 use byteorder::{LittleEndian, ReadBytesExt};
 use futures::FutureExt;
-use log::{debug, error, trace, warn};
+use log::{debug, error, info, trace, warn};
 use std::collections::VecDeque;
 use std::io::{BufRead, Cursor, Read};
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::select;
 use tokio::sync::{broadcast, Mutex};
 use tokio_stream::{StreamExt, StreamMap};
@@ -47,7 +48,7 @@ lazy_static! {
 
 pub async fn find_device(
 	manager: Manager,
-	args: Args,
+	args: &Args,
 ) -> Result<Option<(Peripheral, PeripheralProperties)>, anyhow::Error> {
 	// Scan all BT adapters (not actually tested with more than one)
 	let adapters = manager.adapters().await?;
@@ -57,7 +58,7 @@ pub async fn find_device(
 		ad.start_scan(ScanFilter::default()).await?;
 	}
 
-	let arg_addr = if let Some(str) = args.device {
+	let arg_addr = if let Some(str) = &args.device {
 		Some(BDAddr::from_str(&str)?)
 	} else {
 		None
@@ -93,11 +94,42 @@ pub async fn find_device(
 }
 
 pub async fn device_loop(
+	args: Args,
 	mut brx: broadcast::Receiver<Event>,
 	btx: broadcast::Sender<Event>,
-	device: Arc<Peripheral>,
 ) -> Result<Event, anyhow::Error> {
 	debug!("starting device loop");
+	
+	let manager = Manager::new().await?;
+	
+	let found = tokio::time::timeout(
+		Duration::from_secs(args.find_timeout),
+		find_device(manager, &args),
+	)
+	.await??;
+
+	let (device, props) = found.ok_or(anyhow::Error::msg("No device found"))?;
+	let device = Arc::new(device);
+	if args.device.is_none() {
+		info!(
+			"Selected device: {} {:?}",
+			device.address(),
+			props.local_name
+		);
+	}
+
+	let connected = device.is_connected().await?;
+	info!("Connected = {connected}");
+	if !connected {
+		info!("Connecting");
+		let res = tokio::time::timeout(
+			Duration::from_secs(args.connect_timeout),
+			device.connect()
+		).await;
+		debug!("connect result: {:?}", res);
+		res??;
+	}
+	info!("Connected");
 
 	device.discover_services().await?;
 	let chars = device.characteristics();
@@ -143,6 +175,23 @@ pub async fn device_loop(
 	let device_arc = device.clone();
 
 	let mut notif_stream = device.notifications().await?;
+	
+	let maybe_handle_command = async move |cmd: Command| {
+		match cmd {
+			Command::Scan => {
+				enqueue_command(&SCAN_CMD).await?;
+			}
+			Command::Calibrate => {
+				enqueue_command(&CALIBRATE_CMD).await?;
+			}
+			Command::Status => {
+				enqueue_command(&INFO_CMD).await?;
+				enqueue_command(&BATTERY_CMD).await?;
+			}
+			_ => {}
+		}
+		Ok::<(), anyhow::Error>(())
+	};
 
 	let mut count: usize = 0;
 	loop {
@@ -209,17 +258,16 @@ pub async fn device_loop(
 			},
 			ev = brx.recv() => match ev? {
 				Event::Exit => {
+					debug!("exiting dev_loop");
 					return Ok(Event::Exit);
 				}
-				Event::Command(Command::Scan) => {
-					enqueue_command(&SCAN_CMD).await?;
+				Event::Command(cmd) => {
+					maybe_handle_command(cmd).await?;
 				}
-				Event::Command(Command::Calibrate) => {
-					enqueue_command(&CALIBRATE_CMD).await?;
-				}
-				Event::Command(Command::Status) => {
-					enqueue_command(&INFO_CMD).await?;
-					enqueue_command(&BATTERY_CMD).await?;
+				Event::CommandQueue(q) => {
+					for cmd in q {
+						maybe_handle_command(cmd).await?;
+					}
 				}
 				_ => {}
 			}

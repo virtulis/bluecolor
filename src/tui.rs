@@ -3,6 +3,8 @@ use crate::output::OutputPrinter;
 use futures::FutureExt;
 use rustyline_async::{Readline, ReadlineEvent, SharedWriter};
 use std::io::Write;
+use std::time::Duration;
+use log::debug;
 use tokio::select;
 use tokio::sync::broadcast;
 
@@ -20,7 +22,12 @@ pub async fn tui_loop(
 			line = rl.readline().fuse() => match line {
 				Ok(ReadlineEvent::Line(str)) => {
 					if let Some(e) = parse_tui_command(&str) {
-						btx.send(e)?;
+						debug!("tui command: {:?}", e);
+						rl.add_history_entry(str.clone().trim().to_string());
+						btx.send(e.clone())?;
+						if e == Event::Exit {
+							break;
+						}
 					}
 				}
 				Ok(ReadlineEvent::Eof) => {
@@ -47,6 +54,7 @@ pub async fn tui_loop(
 			}
 		}
 	}
+	rl.flush()?;
 	Ok(rl)
 }
 

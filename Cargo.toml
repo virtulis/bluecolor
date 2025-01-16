@@ -1,6 +1,6 @@
 [package]
 name = "bluecolor"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 [dependencies]
@@ -17,5 +17,5 @@ hex = "0.4.3"
 byteorder = "1.5.0"
 jzon = "0.12.5"
 rustyline-async = "0.4.4"
-tokio-util = "0.7.13"
 futures = "0.3.31"
+tokio-tungstenite = "0.26.1"

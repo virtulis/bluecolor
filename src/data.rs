@@ -1,7 +1,7 @@
 use jzon::JsonValue;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Triple<T: Display + Copy + Into<JsonValue>> (pub [T; 3]);
 impl <T: Display + Copy + Into<JsonValue>> Display for Triple<T> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -9,7 +9,7 @@ impl <T: Display + Copy + Into<JsonValue>> Display for Triple<T> {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ScanResult {
 	pub idx: usize,
 	pub lab: Triple<f32>,
@@ -19,7 +19,7 @@ pub struct ScanResult {
 	pub rgb: Triple<u8>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
 	Exit,
 	Error(String),
@@ -30,10 +30,11 @@ pub enum Event {
 	PowerLevel(i16),
 	DeviceInfo(Vec<i16>),
 	Calibrated,
-	Command(Command)
+	Command(Command),
+	CommandQueue(Vec<Command>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Command {
 	Scan,
 	Calibrate,

@@ -76,6 +76,7 @@ impl OutputPrinter for JSONPrinter {
 			Event::DeviceInfo(val) => Some(jzon::array!["device_info", val.clone()]),
 			Event::Calibrated => Some(jzon::array!["calibrated"]),
 			Event::Command(_) => None,
+			Event::CommandQueue(_) => None,
 		};
 		msg.map(|m| format!("{m}"))
 	}
