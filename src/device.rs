@@ -101,6 +101,8 @@ pub async fn device_loop(
 	debug!("starting device loop");
 	
 	let manager = Manager::new().await?;
+
+	btx.send(Event::Connecting(None, None))?;
 	
 	let found = tokio::time::timeout(
 		Duration::from_secs(args.find_timeout),
@@ -121,6 +123,7 @@ pub async fn device_loop(
 	let connected = device.is_connected().await?;
 	info!("Connected = {connected}");
 	if !connected {
+		btx.send(Event::Connecting(Some(device.address().to_string()), props.local_name.clone()))?;
 		info!("Connecting");
 		let res = tokio::time::timeout(
 			Duration::from_secs(args.connect_timeout),
@@ -129,6 +132,8 @@ pub async fn device_loop(
 		debug!("connect result: {:?}", res);
 		res??;
 	}
+	
+	btx.send(Event::Connected(device.address().to_string(), props.local_name.clone()))?;
 	info!("Connected");
 
 	device.discover_services().await?;
@@ -176,7 +181,7 @@ pub async fn device_loop(
 
 	let mut notif_stream = device.notifications().await?;
 	
-	let maybe_handle_command = async move |cmd: Command| {
+	let maybe_handle_command = async |cmd: Command| {
 		match cmd {
 			Command::Scan => {
 				enqueue_command(&SCAN_CMD).await?;
@@ -255,6 +260,9 @@ pub async fn device_loop(
 					btx.send(Event::Disconnected)?;
 					return Ok(Event::Disconnected);
 				}
+			},
+			_ = tokio::time::sleep(Duration::from_secs(args.keepalive_interval)) => {
+				enqueue_command(&BATTERY_CMD).await?;
 			},
 			ev = brx.recv() => match ev? {
 				Event::Exit => {

@@ -24,7 +24,7 @@ pub enum Event {
 	Exit,
 	Error(String),
 	Scan(ScanResult),
-	Connecting,
+	Connecting(Option<String>, Option<String>),
 	Connected(String, Option<String>),
 	Disconnected,
 	PowerLevel(i16),

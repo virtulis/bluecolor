@@ -69,7 +69,7 @@ impl OutputPrinter for JSONPrinter {
 			Event::Exit => Some(jzon::array!["exit"]),
 			Event::Error(str) => Some(jzon::array!["error", str.clone()]),
 			Event::Scan(res) => Some(jzon::array!["scan", res.idx, self.format_result(&res)]),
-			Event::Connecting => Some(jzon::array!["connecting"]),
+			Event::Connecting(addr, name) => Some(jzon::array!["connecting", addr.clone(), name.clone()]),
 			Event::Connected(addr, name) => Some(jzon::array!["connected", addr.clone(), name.clone()]),
 			Event::Disconnected => Some(jzon::array!["disconnected"]),
 			Event::PowerLevel(val) => Some(jzon::array!["power_level", val.clone()]),

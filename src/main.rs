@@ -12,7 +12,6 @@ use std::time::Duration;
 
 use crate::data::{Command, Event};
 use crate::output::{JSONPrinter, OutputFormat, OutputPrinter, TextPrinter};
-use btleplug::api::Peripheral as _;
 use clap::Parser;
 use env_logger::Target::Pipe;
 use env_logger::{Env, WriteStyle};
@@ -60,6 +59,10 @@ struct Args {
 	/// Seconds to wait between reconnect attempts
 	#[arg(long, default_value_t = 30)]
 	reconnect_interval: u64,
+	
+	/// Send status command if connected but idle for that many seconds
+	#[arg(long, default_value_t = 30)]
+	keepalive_interval: u64,
 
 	/// Get battery level and SN on launch.
 	#[arg(short, long)]
