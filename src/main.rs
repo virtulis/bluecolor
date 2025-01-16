@@ -8,21 +8,16 @@ mod tui;
 
 use std::io::IsTerminal;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::sync::Arc;
 use std::time::Duration;
 
 use crate::data::{Command, Event};
 use crate::output::{JSONPrinter, OutputFormat, OutputPrinter, TextPrinter};
 use btleplug::api::Peripheral as _;
-use btleplug::platform::Manager;
 use clap::Parser;
 use env_logger::Target::Pipe;
 use env_logger::{Env, WriteStyle};
-use futures::future::OptionFuture;
-use futures::TryFutureExt;
-use log::{debug, error, info};
+use log::{debug, error};
 use rustyline_async::Readline;
-use tokio::select;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use crate::server::server_loop;

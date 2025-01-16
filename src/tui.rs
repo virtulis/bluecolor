@@ -3,7 +3,6 @@ use crate::output::OutputPrinter;
 use futures::FutureExt;
 use rustyline_async::{Readline, ReadlineEvent, SharedWriter};
 use std::io::Write;
-use std::time::Duration;
 use log::debug;
 use tokio::select;
 use tokio::sync::broadcast;

@@ -1,5 +1,5 @@
 use crate::data::{Command, Event, ScanResult, Triple};
-use crate::{device, Args};
+use crate::Args;
 use btleplug::api::CentralEvent::DeviceDiscovered;
 use btleplug::api::WriteType::WithoutResponse;
 use btleplug::api::{BDAddr, Central, Manager as _, Peripheral as _, PeripheralProperties, ScanFilter};

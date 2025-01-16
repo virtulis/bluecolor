@@ -1,5 +1,4 @@
 use std::net::SocketAddr;
-use futures::future::select;
 use futures::{FutureExt, StreamExt};
 use log::{debug, info};
 use tokio::net::{TcpListener, TcpStream};
