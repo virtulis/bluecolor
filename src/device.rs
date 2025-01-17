@@ -272,6 +272,8 @@ pub async fn device_loop(
 				Event::Command(cmd) => match cmd {
 					Command::Disconnect => {
 						debug!("disconnecting dev_loop");
+						device.unsubscribe(&notif_char).await?;
+						device.disconnect().await?;
 						btx.send(Event::Disconnected)?;
 						return Ok(Event::Command(cmd));
 					}

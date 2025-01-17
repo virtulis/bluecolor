@@ -185,11 +185,13 @@ async fn main() -> Result<(), anyhow::Error> {
 					}
 					_ => {
 						debug!("device_loop exited with: {:?}", ev);
+						btx.send(Event::Disconnected)?;
 					}
 				},
 				Err(e) => {
 					debug!("device_loop exited with: {:?}", e);
 					error!("device_loop error: {e}");
+					btx.send(Event::Disconnected)?;
 					command_queue.clear();
 				}
 			}
