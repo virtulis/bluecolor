@@ -171,6 +171,14 @@ async fn main() -> Result<(), anyhow::Error> {
 						debug!("exiting 1");
 						break;
 					}
+					Event::Command(Command::Disconnect) => {
+						debug!("disconnected by request, idling");
+						attempts = 0;
+						command_queue.clear();
+						try_connecting = false;
+						brx = brx.resubscribe();
+						continue;
+					}
 					Event::Disconnected => {
 						attempts = 0; // had a successful connection, reset counter
 						command_queue.clear();
@@ -186,31 +194,43 @@ async fn main() -> Result<(), anyhow::Error> {
 				}
 			}
 			try_connecting = args.remain && attempts < args.reconnect_attempts;
+			brx = brx.resubscribe();
 			if try_connecting && attempts > 1 {
 				tokio::time::sleep(Duration::from_secs(args.reconnect_interval)).await;
 			}
 		}
 		else {
 			match brx.recv().await? {
-				Event::Command(cmd) => match cmd {
-					Command::Reconnect => {
-						attempts = 0;
-						try_connecting = true;
-					}
-					Command::Scan | Command::Calibrate | Command::Status => {
-						attempts = 0;
-						try_connecting = true;
-						command_queue.push(cmd);
-					}
-					_ => {
-						btx.send(Event::Error("Device is disconnected".to_owned()))?;
+				Event::Command(cmd) => {
+					debug!("received command: {:?}", cmd);
+					match cmd {
+						Command::Reconnect => {
+							attempts = 0;
+							try_connecting = true;
+							command_queue.clear();
+						}
+						Command::Disconnect => {
+							attempts = 0;
+							try_connecting = false;
+							command_queue.clear();
+						}
+						Command::Scan | Command::Calibrate | Command::Status => {
+							attempts = 0;
+							try_connecting = true;
+							command_queue.push(cmd);
+						}
+						_ => {
+							btx.send(Event::Error("Device is disconnected".to_owned()))?;
+						}
 					}
 				}
 				Event::Exit => {
 					debug!("exiting 2");
 					break;
 				}
-				_ => {}
+				wat => {
+					debug!("other event {:?}", wat);
+				}
 			}
 		}
 		

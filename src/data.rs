@@ -46,11 +46,11 @@ pub enum Command {
 
 #[derive(Debug, Clone, Default)]
 pub struct State {
-	connected: bool,
-	connecting: bool,
-	device_address: Option<String>,
-	device_name: Option<String>,
-	power_level: Option<i16>,
-	device_info_raw: Option<Vec<u8>>,
-	calibrated: bool,
+	pub connected: bool,
+	pub connecting: bool,
+	pub device_address: Option<String>,
+	pub device_name: Option<String>,
+	pub power_level: Option<i16>,
+	pub device_info_raw: Option<Vec<i16>>,
+	pub calibrated: Option<std::time::SystemTime>,
 }

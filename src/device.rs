@@ -269,8 +269,15 @@ pub async fn device_loop(
 					debug!("exiting dev_loop");
 					return Ok(Event::Exit);
 				}
-				Event::Command(cmd) => {
-					maybe_handle_command(cmd).await?;
+				Event::Command(cmd) => match cmd {
+					Command::Disconnect => {
+						debug!("disconnecting dev_loop");
+						btx.send(Event::Disconnected)?;
+						return Ok(Event::Command(cmd));
+					}
+					_ => {
+						maybe_handle_command(cmd).await?;
+					}
 				}
 				Event::CommandQueue(q) => {
 					for cmd in q {

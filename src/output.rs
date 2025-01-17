@@ -40,6 +40,7 @@ impl OutputPrinter for TextPrinter {
 			Event::PowerLevel(val) => Some(format!("Power level: {val}")),
 			Event::Error(str) => Some(format!("Error: {str}")),
 			Event::Calibrated => Some("Calibrated".to_owned()),
+			Event::Disconnected => Some("Disconnected".to_owned()),
 			Event::Connected(addr, name) => Some(format!("Connected to {} ({})", addr, name.clone().unwrap_or("unnamed".to_owned()))),
 			_ => None,
 		}
@@ -62,10 +63,8 @@ impl JSONPrinter {
 		};
 		jzon::object! { scan: scan }
 	}
-}
-impl OutputPrinter for JSONPrinter {
-	fn format_event(&self, event: &Event) -> Option<String> {
-		let msg = match event {
+	pub fn format_event_json(&self, event: &Event) -> Option<JsonValue> {
+		match event {
 			Event::Exit => Some(jzon::array!["exit"]),
 			Event::Error(str) => Some(jzon::array!["error", str.clone()]),
 			Event::Scan(res) => Some(jzon::array!["scan", res.idx, self.format_result(&res)]),
@@ -77,10 +76,13 @@ impl OutputPrinter for JSONPrinter {
 			Event::Calibrated => Some(jzon::array!["calibrated"]),
 			Event::Command(_) => None,
 			Event::CommandQueue(_) => None,
-		};
-		msg.map(|m| format!("{m}"))
+		}
 	}
-	
+}
+impl OutputPrinter for JSONPrinter {
+	fn format_event(&self, event: &Event) -> Option<String> {
+		self.format_event_json(event).map(|m| format!("{m}"))
+	}
 }
 
 pub async fn log_loop(
