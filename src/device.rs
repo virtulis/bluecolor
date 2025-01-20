@@ -14,7 +14,7 @@ use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::select;
 use tokio::sync::{broadcast, Mutex};
 use tokio_stream::{StreamExt, StreamMap};
@@ -144,7 +144,7 @@ pub async fn device_loop(
 	let notif_char = chars
 		.iter()
 		.find(|c| c.uuid == *NOTIF_CHR_ID)
-		.unwrap()
+		.ok_or(anyhow::Error::msg("No notif_char found"))?
 		.clone();
 	debug!("notif_char = {notif_char:?}");
 	device.subscribe(&notif_char).await?;
@@ -152,13 +152,22 @@ pub async fn device_loop(
 	let write_char = chars
 		.iter()
 		.find(|c| c.uuid == *WRITE_CHR_ID)
-		.unwrap()
+		.ok_or(anyhow::Error::msg("No write_char found"))?
 		.clone();
 	let write_char_clone = write_char.clone();
 	debug!("write_char = {write_char:?}");
 
 	let waiting = Arc::new(AtomicBool::new(false));
 	let commands = Arc::new(Mutex::new(VecDeque::<Vec<u8>>::new()));
+	
+	let try_cleanup = async || {
+		if let Err(e) = device.unsubscribe(&notif_char).await {
+			warn!("unsubscribe failed: {e:?}");
+		}
+		if let Err(e) = device.disconnect().await {
+			warn!("disconnect failed: {e:?}");
+		}		
+	};
 
 	let waiting_arc = waiting.clone();
 	let device_arc = device.clone();
@@ -167,7 +176,12 @@ pub async fn device_loop(
 		let mut commands = commands_arc.lock().await;
 		if commands.is_empty() && !waiting_arc.load(Relaxed) {
 			debug!("write immediate command: {:x?}", cmd);
-			device_arc.write(&write_char, cmd, WithoutResponse).await?;
+			let wres = device_arc.write(&write_char, cmd, WithoutResponse).await;
+			if let Err(e) = wres {
+				error!("write failed: {e:?}");
+				try_cleanup().await;
+				return Err(e.into());
+			}
 			waiting_arc.store(true, Relaxed);
 		} else {
 			commands.push_back(cmd.clone());
@@ -199,6 +213,8 @@ pub async fn device_loop(
 	};
 
 	let mut count: usize = 0;
+	let mut last_result_at = Instant::now();
+	let mut last_result_msg: Vec<u8> = Vec::new();
 	loop {
 		select! {
 			btev = notif_stream.next().fuse() => match btev {
@@ -216,14 +232,19 @@ pub async fn device_loop(
 
 					if b == 0x44 {
 						debug!("Is color scan result (AB44)");
-
-						count += 1;
-						let idx = count;
-						let result = parse_scan_result(idx, msg);
-
-						debug!("result = {result:?}");
-						btx.send(Event::Scan(result))?;
-						// printer.format_result(result);
+						
+						if msg == last_result_msg && Instant::now() - last_result_at < Duration::from_millis(300) {
+							warn!("Duplicated result, dropping: {:x?}", msg);
+						}
+						else {
+							count += 1;
+							last_result_msg = msg.clone();
+							last_result_at = Instant::now();
+							let idx = count;
+							let result = parse_scan_result(idx, msg);
+							debug!("result = {result:?}");
+							btx.send(Event::Scan(result))?;
+						}
 					} else if (b, c) == (0x20, 0x2E) {
 						debug!("Is calibration response (AB202E)");
 						btx.send(Event::Calibrated)?;
@@ -247,10 +268,14 @@ pub async fn device_loop(
 					let mut commands = commands_arc.lock().await;
 					if let Some(cmd) = commands.pop_front() {
 						debug!("write queued command: {:x?}", cmd);
-						device_arc
+						let wres = device_arc
 							.write(&write_char_clone, &cmd, WithoutResponse)
-							.await
-							.unwrap();
+							.await;
+						if let Err(e) = wres {
+							error!("write failed: {e:?}");
+							try_cleanup().await;
+							return Err(e.into());
+						}
 						waiting_arc.store(true, Relaxed);
 					} else {
 						waiting_arc.store(false, Relaxed);
@@ -258,6 +283,7 @@ pub async fn device_loop(
 				},
 				None => {
 					btx.send(Event::Disconnected)?;
+					try_cleanup().await;
 					return Ok(Event::Disconnected);
 				}
 			},
@@ -267,13 +293,13 @@ pub async fn device_loop(
 			ev = brx.recv() => match ev? {
 				Event::Exit => {
 					debug!("exiting dev_loop");
+					try_cleanup().await;
 					return Ok(Event::Exit);
 				}
 				Event::Command(cmd) => match cmd {
 					Command::Disconnect => {
 						debug!("disconnecting dev_loop");
-						device.unsubscribe(&notif_char).await?;
-						device.disconnect().await?;
+						try_cleanup().await;
 						btx.send(Event::Disconnected)?;
 						return Ok(Event::Command(cmd));
 					}
