@@ -1,6 +1,6 @@
 # bluecolor
 
-A CLI tool for **Linshang LS170** Bluetooth colorimeters. Likely works with LS171 just as well. Reverse engineered from the LScolor Android app.
+A CLI tool for **Linshang LS170** and **LS171** Bluetooth colorimeters. Reverse engineered from the LScolor Android app.
 
 Developed and tested on Linux but likely to work on Windows and macOS too. (let me know!)
 
@@ -11,6 +11,13 @@ Work in progress:
 - [x] Calibration
 - [x] Battery status
 - [ ] Parse device_info to something readable.
+
+## Changes
+
+### 0.3.0
+
+* Breaking: changed JSON output format.
+* Added WebSocket server mode and TUI "interactive" mode.
 
 ## Installation
 
@@ -28,24 +35,77 @@ If run without any options (`bluecolor`), it will try to find an appropriate dev
 Usage: bluecolor [OPTIONS]
 
 Options:
-  -d, --device <DEVICE>              Address of the device to use (e.g. 00:11:22:33:44:55)
-  -f, --format <FORMAT>              Output format (text, json) [default: text]
-      --log-level <LOG_LEVEL>        Log level (error, warn, info, debug, trace)
-      --scan-timeout <SCAN_TIMEOUT>  Timeout to find the device, in seconds [default: 5]
-  -g, --get-status                   Get battery level and SN on launch
-  -c, --calibrate                    Calibrate on launch (instead of the initial scan)
-  -s, --scan                         Scan on launch
-  -h, --help                         Print help
-  -V, --version                      Print version
+  -d, --device <DEVICE>
+          Address of the device to use (e.g. 00:11:22:33:44:55)
+  -f, --format <FORMAT>
+          Output format (text, json) [default: text]
+      --pipe
+          Skip checking for TTY and always run non-interactive
+      --log-level <LOG_LEVEL>
+          Log level (error, warn, info, debug, trace)
+      --find-timeout <FIND_TIMEOUT>
+          Timeout to find the device, in seconds [default: 10]
+      --remain
+          Do not exit on disconnect or error
+      --connect-timeout <CONNECT_TIMEOUT>
+          Assume connect attempt failed if there is no result for that many seconds [default: 30]
+      --reconnect-attempts <RECONNECT_ATTEMPTS>
+          Reconnect attempts (if all fail, give up until new commands are received) [default: 10]
+      --reconnect-interval <RECONNECT_INTERVAL>
+          Seconds to wait between reconnect attempts [default: 30]
+      --keepalive-interval <KEEPALIVE_INTERVAL>
+          Send status command if connected but idle for that many seconds [default: 30]
+  -g, --get-status
+          Get battery level and SN on launch
+  -c, --calibrate
+          Calibrate on launch (instead of the initial scan)
+  -s, --scan
+          Scan on launch
+      --listen <PORT>
+          Start a multi-tenant WebSocket server on this port
+      --host <HOST>
+          Websocket server host [default: 127.0.0.1]
+  -h, --help
+          Print help
+  -V, --version
+          Print version
+
 ```
 
-## Output example
+## Usage examples
 
-### Text:
+### Interactive
+
+A very basic "interactive" mode is exposed by default (if run in a terminal)
+
+    bluecolor
+
+Available commands are
+
+    status
+    calibrate
+    scan
+    disconnect
+    reconnect
+    exit
+
+There are no arguments to any of these.
+
+### Server mode
+
+Runs a persistent WebSocket server that can receive commands and will broadcast results to all clients. Used by [dabadee](https://github.com/virtulis/dabadee). No encryption or auth is available.
+
+    bluecolor --listen 8765
+
+Commands are same as above, sent as JSON arrays with one element, e.g. `["scan"]`.
+
+Responses are tuples of `["command", ...results]` (see JSON mode below).
+
+### Non-interactive, text:
 
 Run as:
 
-    bluecolor --get-status --calibrate --scan
+    bluecolor --pipe --get-status --calibrate --scan
 
 Output:
 
@@ -63,21 +123,21 @@ Scan result #: 1
 
 ```
 
-### Text:
+### Non-interactive, JSON:
 
 Run as:
 
-    bluecolor --get-status --calibrate --scan --format json --log-level error
+    bluecolor --pipe --get-status --calibrate --scan --format json --log-level error
 
 Output:
 
 ```json lines
-{"device_info":[2023,2311,6921,-14053,1993,8711,2594,-13814,-15926,21953,85,28928,-11919,3793,14]}
-{"power_level":41}
-{"calibrated":true}
-{"scan":{"lab":[92.6,-0.29,0.59],"luv":[92.6,-0.04,0.94],"lch":[92.6,0.65,116.2],"yxy":[82.05,31.44,33.22],"rgb":[234,234,231]}}
-{"scan":{"lab":[58.99,-12.03,21.17],"luv":[58.99,-5.33,29.22],"lch":[58.99,24.35,119.61],"yxy":[27.02,34.2,40.42],"rgb":[135,147,103]}}
-{"scan":{"lab":[76.02,13.89,0.19],"luv":[76.02,20.25,-2.19],"lch":[76.02,13.9,0.82],"yxy":[49.93,33.69,32.04],"rgb":[213,179,186]}}
+["connecting",null,null]
+["connected","DC:8E:95:66:CD:B8","LS170002377"]
+["device_info",[2023,2311,6921,-14053,1993,8711,2594,-13814,-15926,21953,85,28928,-11919,3793,14]]
+["power_level",41]
+["calibrated"]
+["scan",1,{"scan":{"lab":[92.59,-0.29,0.55],"luv":[92.59,-0.07,0.89],"lch":[92.59,0.62,117.89],"yxy":[82.05,31.43,33.22],"rgb":[234,234,231]}}]
 ```
 
 ## Disclaimer

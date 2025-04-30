@@ -67,6 +67,7 @@ fn parse_tui_command(line: &str) -> Option<Event> {
 			"scan" => Some(Event::Command(Command::Scan)),
 			"status" => Some(Event::Command(Command::Status)),
 			"disconnect" => Some(Event::Command(Command::Disconnect)),
+			"reconnect" => Some(Event::Command(Command::Reconnect)),
 			_ => Some(Event::Error(format!("Unknown command: {}", cmd))),
 		},
 	}
