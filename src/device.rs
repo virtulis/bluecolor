@@ -2,7 +2,9 @@ use crate::data::{Command, Event, ScanResult, Triple};
 use crate::Args;
 use btleplug::api::CentralEvent::DeviceDiscovered;
 use btleplug::api::WriteType::WithoutResponse;
-use btleplug::api::{BDAddr, Central, Manager as _, Peripheral as _, PeripheralProperties, ScanFilter};
+use btleplug::api::{
+	BDAddr, Central, Manager as _, Peripheral as _, PeripheralProperties, ScanFilter,
+};
 use btleplug::platform::{Manager, Peripheral};
 use byteorder::ByteOrder;
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -18,19 +20,23 @@ use std::time::{Duration, Instant};
 use tokio::select;
 use tokio::sync::{broadcast, Mutex};
 use tokio_stream::{StreamExt, StreamMap};
-use uuid::Uuid;
+use uuid::{uuid, Uuid};
 
 lazy_static! {
 
-	/// Command destination service
-	static ref WRITE_SVC_ID: Uuid = Uuid::parse_str("0000ffe5-0000-1000-8000-00805f9b34fb").unwrap();
-	/// Command destination characteristic
-	static ref WRITE_CHR_ID: Uuid = Uuid::parse_str("0000ffe9-0000-1000-8000-00805f9b34fb").unwrap();
+	/// Notification service+characteristic IDs. Three versions seem to exist, and in two of them notif and write are the same service.
+	static ref NOTIF_UUIDS: Vec<(Uuid, Uuid)> = vec![
+		(uuid!("0000ffe0-0000-1000-8000-00805f9b34fb"), uuid!("0000ffe4-0000-1000-8000-00805f9b34fb")),
+		(uuid!("00001001-0000-1000-8000-00805f9b34fb"), uuid!("00001002-0000-1000-8000-00805f9b34fb")),
+		(uuid!("0000fff0-0000-1000-8000-00805f9b34fb"), uuid!("0000fff1-0000-1000-8000-00805f9b34fb")),
+	];
 
-	/// Notification service
-	static ref NOTIF_SVC_ID: Uuid = Uuid::parse_str("0000ffe0-0000-1000-8000-00805f9b34fb").unwrap();
-	/// Notification characteristic
-	static ref NOTIF_CHR_ID: Uuid = Uuid::parse_str("0000ffe4-0000-1000-8000-00805f9b34fb").unwrap();
+	/// Command destination UUIDs
+	static ref WRITE_UUIDS: Vec<(Uuid, Uuid)> = vec![
+		(uuid!("0000ffe5-0000-1000-8000-00805f9b34fb"), uuid!("0000ffe9-0000-1000-8000-00805f9b34fb")),
+		(uuid!("00001001-0000-1000-8000-00805f9b34fb"), uuid!("00001002-0000-1000-8000-00805f9b34fb")),
+		(uuid!("0000fff0-0000-1000-8000-00805f9b34fb"), uuid!("0000fff1-0000-1000-8000-00805f9b34fb")),
+	];
 
 	/// The command to trigger a color scan (results sent as AB44... notification)
 	static ref SCAN_CMD: Vec<u8> = hex::decode("AB440000000036001864").unwrap();
@@ -70,8 +76,8 @@ pub async fn find_device(
 			let ad = &adapters[aidx];
 			let p = ad.peripheral(&pid).await?;
 			if let Some(props) = p.properties().await? {
-				let capable = props.services.contains(&WRITE_SVC_ID)
-					&& props.services.contains(&NOTIF_SVC_ID);
+				let capable = WRITE_UUIDS.iter().any(|(s, _)| props.services.contains(s))
+					&& NOTIF_UUIDS.iter().any(|(s, _)| props.services.contains(s));
 				debug!(
 					"device {} ({:?}), capable = {:?}",
 					props.address, props.local_name, capable
@@ -99,11 +105,11 @@ pub async fn device_loop(
 	btx: broadcast::Sender<Event>,
 ) -> Result<Event, anyhow::Error> {
 	debug!("starting device loop");
-	
+
 	let manager = Manager::new().await?;
 
 	btx.send(Event::Connecting(None, None))?;
-	
+
 	let found = tokio::time::timeout(
 		Duration::from_secs(args.find_timeout),
 		find_device(manager, &args),
@@ -123,17 +129,21 @@ pub async fn device_loop(
 	let connected = device.is_connected().await?;
 	info!("Connected = {connected}");
 	if !connected {
-		btx.send(Event::Connecting(Some(device.address().to_string()), props.local_name.clone()))?;
+		btx.send(Event::Connecting(
+			Some(device.address().to_string()),
+			props.local_name.clone(),
+		))?;
 		info!("Connecting");
-		let res = tokio::time::timeout(
-			Duration::from_secs(args.connect_timeout),
-			device.connect()
-		).await;
+		let res =
+			tokio::time::timeout(Duration::from_secs(args.connect_timeout), device.connect()).await;
 		debug!("connect result: {:?}", res);
 		res??;
 	}
-	
-	btx.send(Event::Connected(device.address().to_string(), props.local_name.clone()))?;
+
+	btx.send(Event::Connected(
+		device.address().to_string(),
+		props.local_name.clone(),
+	))?;
 	info!("Connected");
 
 	device.discover_services().await?;
@@ -141,17 +151,19 @@ pub async fn device_loop(
 
 	trace!("chars = {chars:?}");
 
+	let char_uuids = NOTIF_UUIDS.iter().map(|t| t.1).collect::<Vec<_>>();
 	let notif_char = chars
 		.iter()
-		.find(|c| c.uuid == *NOTIF_CHR_ID)
+		.find(|c| char_uuids.contains(&c.uuid))
 		.ok_or(anyhow::Error::msg("No notif_char found"))?
 		.clone();
 	debug!("notif_char = {notif_char:?}");
 	device.subscribe(&notif_char).await?;
-
+	
+	let char_uuids = WRITE_UUIDS.iter().map(|t| t.1).collect::<Vec<_>>();
 	let write_char = chars
 		.iter()
-		.find(|c| c.uuid == *WRITE_CHR_ID)
+		.find(|c| char_uuids.contains(&c.uuid))
 		.ok_or(anyhow::Error::msg("No write_char found"))?
 		.clone();
 	let write_char_clone = write_char.clone();
@@ -159,14 +171,14 @@ pub async fn device_loop(
 
 	let waiting = Arc::new(AtomicBool::new(false));
 	let commands = Arc::new(Mutex::new(VecDeque::<Vec<u8>>::new()));
-	
+
 	let try_cleanup = async || {
 		if let Err(e) = device.unsubscribe(&notif_char).await {
 			warn!("unsubscribe failed: {e:?}");
 		}
 		if let Err(e) = device.disconnect().await {
 			warn!("disconnect failed: {e:?}");
-		}		
+		}
 	};
 
 	let waiting_arc = waiting.clone();
@@ -194,7 +206,7 @@ pub async fn device_loop(
 	let device_arc = device.clone();
 
 	let mut notif_stream = device.notifications().await?;
-	
+
 	let maybe_handle_command = async |cmd: Command| {
 		match cmd {
 			Command::Scan => {
@@ -232,7 +244,7 @@ pub async fn device_loop(
 
 					if b == 0x44 {
 						debug!("Is color scan result (AB44)");
-						
+
 						if msg == last_result_msg && Instant::now() - last_result_at < Duration::from_millis(300) {
 							warn!("Duplicated result, dropping: {:x?}", msg);
 						}
