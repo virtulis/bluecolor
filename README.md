@@ -12,6 +12,8 @@ Work in progress:
 - [x] Battery status
 - [ ] Parse device_info to something readable.
 
+There is a basic [web-based UI](../dabadee) available for scanning charts in batches.
+
 ## Changes
 
 ### 0.3.0
@@ -71,6 +73,23 @@ Options:
           Print version
 
 ```
+
+## Troubleshooting
+
+### Color accuracy
+
+* LS171 is significantly more accurate on most surfaces.
+* These colorimeters report Lab values with the **D65** illuminant. Most color profiling software (e.g. Argyll) expects **D50**. If your hues are off, make sure you convert readings to the appropriate illuminant.
+* It takes several seconds for a sample to scan, avoid moving the device until you receive the reading.
+
+### Connection
+
+* The device *requires* Bluetooth LE and will not work without it.
+* The connection can be rather flaky (especially on first-gen? LS170). It may help to:
+  * Disable Wi-Fi and any other BT devices on the receiving device. 
+  * Move the colorimeter closer to the receiving device.
+* If you have trouble initiating the connection, ensure the adapter is scanning for devices *before* starting bluecolor. E.g.
+  * E.g. `bluetoothctl scan le`
 
 ## Usage examples
 
