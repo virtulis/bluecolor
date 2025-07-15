@@ -12,7 +12,7 @@ Work in progress:
 - [x] Battery status
 - [ ] Parse device_info to something readable.
 
-There is a basic [web-based UI](../dabadee) available for scanning charts in batches.
+There is a basic [web-based UI](https://github.com/virtulis/dabadee) available for scanning charts in batches.
 
 ## Changes
 
