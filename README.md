@@ -1,3 +1,8 @@
+## Migrated to Codeberg.
+
+Development will continue at https://codeberg.org/virtulis/bluecolor
+
+
 # bluecolor
 
 A CLI tool for **Linshang LS170** and **LS171** Bluetooth colorimeters. Reverse engineered from the LScolor Android app.
